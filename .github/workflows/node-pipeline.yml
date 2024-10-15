@@ -3,6 +3,7 @@ name: node-pipeline
 on:
   workflow_call:
     inputs:
+      # General
       node-version:
         type: string
         required: false
@@ -14,10 +15,18 @@ on:
       repository-owner:
         type: string
         required: true
+      runs-on:
+        type: string
+        required: false
+        default: ubuntu-latest
+      # Scripts
       check-run:
         type: string
         required: false
       release-check-run:
+        type: string
+        required: false
+      build-run:
         type: string
         required: false
       release-run:
@@ -26,10 +35,14 @@ on:
       pre-release-run:
         type: string
         required: false
+      # Artifacts
+      build-path:
+        type: string
+        required: false
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runs-on }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -38,7 +51,7 @@ jobs:
           registry-url: ${{ inputs.registry-url }}
       - run: ${{ inputs.check-run }}
   release-check:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runs-on }}
     needs: check
     if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && github.repository_owner == ${{ inputs.repository-owner }}
     steps:
@@ -48,9 +61,29 @@ jobs:
           node-version: ${{ inputs.node-version }}
           registry-url: ${{ inputs.registry-url }}
       - run: ${{ inputs.release-check-run }}
-  release:
-    runs-on: ubuntu-latest
+  build:
+    runs-on: ${{ inputs.runs-on }}
     needs: release-check
+    if: ${{ inputs.build-path }} != ''
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          registry-url: ${{ inputs.registry-url }}
+      - run: ${{ inputs.build-run }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build-artifact-${{ github.sha }}
+          path: ${{ inputs.build-path }}
+  build-check:
+    runs-on: ${{ inputs.runs-on }}
+    needs: build
+    if: always() && (needs.build.result == 'skipped' || needs.build.result == 'success')
+    steps: [] # TODO: does this work
+  release:
+    runs-on: ${{ inputs.runs-on }}
+    needs: build-check
     if: contains(github.event.head_commit.message, '[release]') && !contains(github.event.head_commit.message, '[pre-release]')
     env:
       GH_TOKEN: ${{ github.token }}
@@ -62,10 +95,14 @@ jobs:
         with:
           node-version: ${{ inputs.node-version }}
           registry-url: ${{ inputs.registry-url }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: build-artifact-${{ github.sha }}
+          path: ${{ inputs.build-path }}
       - run: ${{ inputs.release-run }}
   pre-release:
-    runs-on: ubuntu-latest
-    needs: release-check
+    runs-on: ${{ inputs.runs-on }}
+    needs: build-check
     if: contains(github.event.head_commit.message, '[pre-release]') && !contains(github.event.head_commit.message, '[release]')
     env:
       GH_TOKEN: ${{ github.token }}
@@ -77,4 +114,8 @@ jobs:
         with:
           node-version: ${{ inputs.node-version }}
           registry-url: ${{ inputs.registry-url }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: build-artifact-${{ github.sha }}
+          path: ${{ inputs.build-path }}
       - run: ${{ inputs.pre-release-run }}

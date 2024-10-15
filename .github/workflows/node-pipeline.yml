@@ -14,6 +14,11 @@ on:
       repository-owner:
         type: string
         required: true
+      runs-on:
+        type: string
+        required: false
+        default: ubuntu-latest
+      # Scripts
       check-run:
         type: string
         required: false
@@ -29,7 +34,7 @@ on:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runs-on }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -38,7 +43,7 @@ jobs:
           registry-url: ${{ inputs.registry-url }}
       - run: ${{ inputs.check-run }}
   release-check:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runs-on }}
     needs: check
     if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && github.repository_owner == ${{ inputs.repository-owner }}
     steps:
@@ -49,7 +54,7 @@ jobs:
           registry-url: ${{ inputs.registry-url }}
       - run: ${{ inputs.release-check-run }}
   release:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runs-on }}
     needs: release-check
     if: contains(github.event.head_commit.message, '[release]') && !contains(github.event.head_commit.message, '[pre-release]')
     env:
@@ -64,7 +69,7 @@ jobs:
           registry-url: ${{ inputs.registry-url }}
       - run: ${{ inputs.release-run }}
   pre-release:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runs-on }}
     needs: release-check
     if: contains(github.event.head_commit.message, '[pre-release]') && !contains(github.event.head_commit.message, '[release]')
     env:

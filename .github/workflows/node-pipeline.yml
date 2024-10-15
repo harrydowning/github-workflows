@@ -3,6 +3,7 @@ name: node-pipeline
 on:
   workflow_call:
     inputs:
+      # General
       node-version:
         type: string
         required: false
@@ -25,10 +26,17 @@ on:
       release-check-run:
         type: string
         required: false
+      build-run:
+        type: string
+        required: false
       release-run:
         type: string
         required: false
       pre-release-run:
+        type: string
+        required: false
+      # Artifacts
+      build-path:
         type: string
         required: false
 
@@ -53,9 +61,23 @@ jobs:
           node-version: ${{ inputs.node-version }}
           registry-url: ${{ inputs.registry-url }}
       - run: ${{ inputs.release-check-run }}
-  release:
+  build:
     runs-on: ${{ inputs.runs-on }}
     needs: release-check
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          registry-url: ${{ inputs.registry-url }}
+      - run: ${{ inputs.build-run }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build-artifact
+          path: ${{ inputs.build-path }}
+  release:
+    runs-on: ${{ inputs.runs-on }}
+    needs: build
     if: contains(github.event.head_commit.message, '[release]') && !contains(github.event.head_commit.message, '[pre-release]')
     env:
       GH_TOKEN: ${{ github.token }}
@@ -67,10 +89,14 @@ jobs:
         with:
           node-version: ${{ inputs.node-version }}
           registry-url: ${{ inputs.registry-url }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: build-artifact
+          path: ${{ inputs.build-path }}
       - run: ${{ inputs.release-run }}
   pre-release:
     runs-on: ${{ inputs.runs-on }}
-    needs: release-check
+    needs: build
     if: contains(github.event.head_commit.message, '[pre-release]') && !contains(github.event.head_commit.message, '[release]')
     env:
       GH_TOKEN: ${{ github.token }}
@@ -82,4 +108,8 @@ jobs:
         with:
           node-version: ${{ inputs.node-version }}
           registry-url: ${{ inputs.registry-url }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: build-artifact
+          path: ${{ inputs.build-path }}
       - run: ${{ inputs.pre-release-run }}

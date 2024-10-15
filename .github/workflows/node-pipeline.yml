@@ -64,6 +64,7 @@ jobs:
   build:
     runs-on: ${{ inputs.runs-on }}
     needs: release-check
+    if: ${{ inputs.build-path }} != ''
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

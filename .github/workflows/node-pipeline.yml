@@ -73,7 +73,7 @@ jobs:
       - run: ${{ inputs.build-run }}
       - uses: actions/upload-artifact@v4
         with:
-          name: build-artifact
+          name: build-artifact-${{ github.sha }}
           path: ${{ inputs.build-path }}
   release:
     runs-on: ${{ inputs.runs-on }}
@@ -91,7 +91,7 @@ jobs:
           registry-url: ${{ inputs.registry-url }}
       - uses: actions/download-artifact@v4
         with:
-          name: build-artifact
+          name: build-artifact-${{ github.sha }}
           path: ${{ inputs.build-path }}
       - run: ${{ inputs.release-run }}
   pre-release:
@@ -110,6 +110,6 @@ jobs:
           registry-url: ${{ inputs.registry-url }}
       - uses: actions/download-artifact@v4
         with:
-          name: build-artifact
+          name: build-artifact-${{ github.sha }}
           path: ${{ inputs.build-path }}
       - run: ${{ inputs.pre-release-run }}
